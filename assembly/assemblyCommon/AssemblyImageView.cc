@@ -23,6 +23,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QGroupBox>
+#include <QTimer>
 
 using namespace std;
 
@@ -73,10 +74,9 @@ AssemblyImageView::AssemblyImageView(QWidget* parent) :
 
     return;
   }
-  mm_per_pixel_row_ = config->getValue<double>("mm_per_pixel_row");
-  mm_per_pixel_col_ = config->getValue<double>("mm_per_pixel_col");
-  const AssemblyParameters* const params = AssemblyParameters::instance(false);
-  angle_FromCameraXYtoRefFrameXY_deg_ = params->get("AngleOfCameraFrameInRefFrame_dA");
+  mm_per_pixel_row_ = config->getValue<double>("main", "mm_per_pixel_row");
+  mm_per_pixel_col_ = config->getValue<double>("main", "mm_per_pixel_col");
+  angle_FromCameraXYtoRefFrameXY_deg_ = config->getValue<double>("parameters", "AngleOfCameraFrameInRefFrame_dA");
 //--------------------------------------------
 
   img_scroll_ = new QScrollArea(this);
@@ -167,6 +167,13 @@ AssemblyImageView::AssemblyImageView(QWidget* parent) :
 
   autofocus_stop_button_ = new QPushButton("Stop Auto-Focus", this);
   autofocus_lay->addWidget(autofocus_stop_button_);
+
+  progBar_ = new QProgressBar(this);
+  autofocus_lay->addWidget(progBar_, Qt::AlignCenter);
+  progBar_->setValue(0); //Set initial value
+  progBar_->setVisible(false); //Invisible by default
+  connect(autofocus_exe_button_, SIGNAL(clicked()), this, SLOT(makeProgBarVisible()));
+  connect(autofocus_stop_button_, SIGNAL(clicked()), this, SLOT(makeProgBarInvisible()));
   // -----
 
   autofocus_lay->addSpacing(20);
@@ -244,7 +251,7 @@ void AssemblyImageView::load_image()
   const QString filename = QFileDialog::getOpenFileName(this, tr("Load Image"), QString::fromStdString(Config::CMSTkModLabBasePath+"/share/assembly"), tr("PNG Files (*.png);;All Files (*)"));
   if(filename.isNull() || filename.isEmpty()){ return; }
 
-  const cv::Mat img = assembly::cv_imread(filename, CV_LOAD_IMAGE_COLOR);
+  const cv::Mat img = assembly::cv_imread(filename, cv::IMREAD_COLOR);
 
   if(img.empty())
   {
@@ -342,15 +349,15 @@ void AssemblyImageView::modify_image_axesConventions()
   cv::Mat img = image_.clone(); //Use current image (possibly with center lines displayed), not raw image
 
   //See: https://docs.opencv.org/2.4/modules/core/doc/drawing_functions.html#puttext
-  //CV_AA = anti-aliased linetype
+  //cv::LINE_AA = anti-aliased linetype
   //Text position is hardcoded
   int fontFace = cv::FONT_HERSHEY_PLAIN; //FONT_HERSHEY_SIMPLEX, ...
   double fontScale = 8;
   int linethick = 3;
-  putText(img, "+x", cv::Point(img.cols/2.0+padding, 2*padding), fontFace, fontScale, cv::Scalar(255,0,0), linethick, CV_AA);
-  putText(img, "-x", cv::Point(img.cols/2.0+padding, img.rows-padding), fontFace, fontScale, cv::Scalar(255,0,0), linethick, CV_AA);
-  putText(img, "+y", cv::Point(padding, img.rows/2.0+2*padding), fontFace, fontScale, cv::Scalar(255,0,0), linethick, CV_AA);
-  putText(img, "-y", cv::Point(img.cols-5*padding, img.rows/2.0+2*padding), fontFace, fontScale, cv::Scalar(255,0,0), linethick, CV_AA);
+  putText(img, "+x", cv::Point(img.cols/2.0+padding, 2*padding), fontFace, fontScale, cv::Scalar(255,0,0), linethick, cv::LINE_AA);
+  putText(img, "-x", cv::Point(img.cols/2.0+padding, img.rows-padding), fontFace, fontScale, cv::Scalar(255,0,0), linethick, cv::LINE_AA);
+  putText(img, "+y", cv::Point(padding, img.rows/2.0+2*padding), fontFace, fontScale, cv::Scalar(255,0,0), linethick, cv::LINE_AA);
+  putText(img, "-y", cv::Point(img.cols-5*padding, img.rows/2.0+2*padding), fontFace, fontScale, cv::Scalar(255,0,0), linethick, cv::LINE_AA);
 
   //Add line/label for distance scale
   line   (img, cv::Point(0, 125), cv::Point(0+167, 125), cv::Scalar(0,255,0), 2, 8, 0);
@@ -358,7 +365,7 @@ void AssemblyImageView::modify_image_axesConventions()
 
   //Add line/label for rotation angle convention (positive angle <-> anti-clockwise)
   line   (img, cv::Point(10, img.rows-180), cv::Point(150, img.rows-80), cv::Scalar(255,0,0), 2, 8, 0);
-  putText(img, "+a", cv::Point(180, img.rows-15), fontFace, fontScale, cv::Scalar(255,0,0), linethick, CV_AA);
+  putText(img, "+a", cv::Point(180, img.rows-15), fontFace, fontScale, cv::Scalar(255,0,0), linethick, cv::LINE_AA);
 
   this->update_image(img, false);
 
@@ -435,7 +442,7 @@ void AssemblyImageView::update_image_zscan(const QString& img_path)
 {
   if(assembly::IsFile(img_path))
   {
-    image_zscan_ = assembly::cv_imread(img_path.toStdString(), CV_LOAD_IMAGE_COLOR);
+    image_zscan_ = assembly::cv_imread(img_path.toStdString(), cv::IMREAD_COLOR);
 
     NQLog("AssemblyImageView", NQLog::Spam) << "update_image_zscan"
        << ": emitting signal \"image_zscan_updated\"";
@@ -654,13 +661,42 @@ void AssemblyImageView::mouseDoubleClickEvent(QMouseEvent* event)
 void AssemblyImageView::display_infoTab()
 {
     QMessageBox::information(this, tr("Information - Image Viewer"),
-            tr("<p>There is no available information about the content of this tab yet.</p>"));
+            tr("<ul>"
+            "<li>Click 'Snapshot' to take a camera image. An image can be loaded/saved.</li>"
+            "<li>Holding the mouseclick over the picture displays the relative x/y distances to the center. Upon double-click on the image, the camera moves to the selected position.</li>"
+            "<li>Clike 'Auto-focus image' to run the z-focus routine: pictures are taken at different z-values, and at the end the camera is moved to the best-focus height determined by the algorithm. Note that the result is interpolated, so the routine may be repeated to find the best average height. The delta-Z range may be adjusted to refine the measurements (min dX=5 microns).</li>"
+            "</ul>"
+            ));
     return;
 }
 
 void AssemblyImageView::InfoMotionFinished()
 {
     emit cameraMotionIsFinished();
+
+    return;
+}
+
+void AssemblyImageView::makeProgBarVisible()
+{
+    progBar_->setVisible(true);
+    return;
+}
+void AssemblyImageView::makeProgBarInvisible()
+{
+    progBar_->setVisible(false);
+    return;
+}
+
+//Update the value of the progress bar
+void AssemblyImageView::update_progBar(int prog)
+{
+    progBar_->setValue(prog);
+    // progBar_->setStyleSheet("QProgressBar::chunk {background: orange;}");
+
+    // progBar_->setProperty("defaultStyleSheet", progBar_->styleSheet());
+    // progBar_->setStyleSheet(progBar_->property("defaultStyleSheet").toString() +
+    // " QProgressBar::chunk { background: green; }");
 
     return;
 }

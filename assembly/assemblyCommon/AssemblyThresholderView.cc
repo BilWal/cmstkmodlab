@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
-//               Copyright (C) 2011-2017 - The DESY CMS Group                  //
+//               Copyright (C) 2011-2022 - The DESY CMS Group                  //
 //                           All rights reserved                               //
 //                                                                             //
 //      The CMStkModLab source code is licensed under the GNU GPL v3.0.        //
@@ -128,8 +128,10 @@ AssemblyThresholderView::AssemblyThresholderView(QWidget* parent) :
   QVBoxLayout* imgbin_thresh_layout = new QVBoxLayout;
   lBin->addLayout(imgbin_thresh_layout);
 
-  imgbin_thresh_button_ = new QPushButton("openCV::threshold", this);
+  imgbin_thresh_button_ = new QPushButton("openCV::threshold", this); //Click this button to read/apply the value in the QLineEdit field
   imgbin_thresh_layout->addWidget(imgbin_thresh_button_);
+  const QSize BUTTON_SIZE = QSize(530, 35); //Set fixed button size
+  imgbin_thresh_button_->setFixedSize(BUTTON_SIZE);
 
   connect(imgbin_thresh_button_, SIGNAL(clicked()), this, SLOT(apply_threshold()));
 
@@ -140,10 +142,32 @@ AssemblyThresholderView::AssemblyThresholderView(QWidget* parent) :
   imgbin_thresh_label_->setText("Threshold (pos int)");
 
   imgbin_thresh_linee_ = new QLineEdit(this);
-  assembly::QLineEdit_setText(imgbin_thresh_linee_, config->getValue<int>("AssemblyThresholderView_threshold", 30));
+  assembly::QLineEdit_setText(imgbin_thresh_linee_, config->getDefaultValue<int>("main", "AssemblyThresholderView_threshold", 30));
 
   imgbin_thresh_inputcfg->addWidget(imgbin_thresh_label_, 40);
   imgbin_thresh_inputcfg->addWidget(imgbin_thresh_linee_, 60);
+
+  //Slider widget to chose the B/W threshold value using the mouse
+  threshold_slider_ = new QSlider(Qt::Horizontal, this);
+
+  //Fancy style
+  threshold_slider_->setStyleSheet("QSlider::groove:horizontal {border: 1px solid #bbb;background: white;height: 10px;border-radius: 4px;}"
+  "QSlider::sub-page:horizontal {background: qlineargradient(x1: 0, y1: 0,    x2: 0, y2: 1,stop: 0 #66e, stop: 1 #bbf); background: qlineargradient(x1: 0, y1: 0.2, x2: 1, y2: 1, stop: 0 #bbf, stop: 1 #55f); border: 1px solid #777; height: 10px; border-radius: 4px;}"
+  "QSlider::add-page:horizontal {background: #fff;border: 1px solid #777;height: 10px;border-radius: 4px;}"
+  "QSlider::handle:horizontal {background: qlineargradient(x1:0, y1:0, x2:1, y2:1,stop:0 #eee, stop:1 #ccc);border: 1px solid #777;width: 13px;margin-top: -2px;margin-bottom: -2px;border-radius: 4px;}"
+  "QSlider::handle:horizontal:hover {background: qlineargradient(x1:0, y1:0, x2:1, y2:1,stop:0 #fff, stop:1 #ddd);border: 1px solid #444;border-radius: 4px;}"
+  "QSlider::sub-page:horizontal:disabled {background: #bbb;border-color: #999;}"
+  "QSlider::add-page:horizontal:disabled {background: #eee;border-color: #999;}"
+  "QSlider::handle:horizontal:disabled {background: #eee;border: 1px solid #aaa;border-radius: 4px;}"
+);
+
+  threshold_slider_->setValue(config->getDefaultValue<int>("main", "AssemblyThresholderView_threshold", 30)); //Init to default value
+  threshold_slider_->setMinimum(0); threshold_slider_->setMaximum(255); //Set range
+  threshold_slider_->setSingleStep(5); //Step values when using left/right keys
+  threshold_slider_->setTickPosition(QSlider::TicksBothSides); //Ticks above+below //Not working with this styleSheet
+  threshold_slider_->setTickInterval(50); //Step interval between ticks
+  imgbin_thresh_inputcfg->addWidget(threshold_slider_, 80);
+  connect(threshold_slider_, SIGNAL(valueChanged(int)), this, SLOT(set_bw_threshold_slider(int)));
   // -----
 
   // method-2: adaptiveThreshold
@@ -164,7 +188,7 @@ AssemblyThresholderView::AssemblyThresholderView(QWidget* parent) :
   imgbin_adathr_label_->setText("Block Size (pos odd int)");
 
   imgbin_adathr_linee_ = new QLineEdit(this);
-  assembly::QLineEdit_setText(imgbin_adathr_linee_, config->getValue<int>("AssemblyThresholderView_adaptiveThreshold", 587));
+  assembly::QLineEdit_setText(imgbin_adathr_linee_, config->getDefaultValue<int>("main", "AssemblyThresholderView_adaptiveThreshold", 587));
 
   imgbin_adathr_inputcfg->addWidget(imgbin_adathr_label_, 40);
   imgbin_adathr_inputcfg->addWidget(imgbin_adathr_linee_, 60);
@@ -221,7 +245,7 @@ void AssemblyThresholderView::load_image_raw()
   const QString filename = QFileDialog::getOpenFileName(this, tr("Load Image"), QString::fromStdString(Config::CMSTkModLabBasePath+"/share/assembly"), tr("PNG Files (*.png);;All Files (*)"));
   if(filename.isNull() || filename.isEmpty()){ return; }
 
-  const cv::Mat img = assembly::cv_imread(filename, CV_LOAD_IMAGE_COLOR);
+  const cv::Mat img = assembly::cv_imread(filename, cv::IMREAD_COLOR);
 
   if(img.empty())
   {
@@ -384,6 +408,19 @@ void AssemblyThresholderView::display_infoTab()
 {
     QMessageBox::information(this, tr("Information - Convert Image to B/W"),
             tr("<p>There is no available information about the content of this tab yet.</p>"));
+
+    return;
+}
+
+//-- Update the B/W threshold when slider value gets changed
+void AssemblyThresholderView::set_bw_threshold_slider(int thr)
+{
+    threshold_slider_->setValue(thr); //Update the slider's value
+    assembly::QLineEdit_setText(imgbin_thresh_linee_, thr); //Update the value displayed
+
+    // NQLog("AssemblyThresholderView", NQLog::Debug) << "apply_threshold" << ": emitting signal \"threshold_value(" << thr << ")\"";
+
+    emit threshold_request(thr); //Update the B/W threshold (real-time)
 
     return;
 }

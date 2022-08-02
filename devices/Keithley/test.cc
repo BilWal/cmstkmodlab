@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
-//               Copyright (C) 2011-2020 - The DESY CMS Group                  //
+//               Copyright (C) 2011-2022 - The DESY CMS Group                  //
 //                           All rights reserved                               //
 //                                                                             //
 //      The CMStkModLab source code is licensed under the GNU GPL v3.0.        //
@@ -23,17 +23,22 @@ typedef KeithleyDAQ6510Fake KeithleyDAQ6510_t;
 typedef KeithleyDAQ6510 KeithleyDAQ6510_t;
 #endif
 
-int main()
+int main(int argc, char* argv[])
 {
   using namespace std::chrono_literals;
 
   std::string buffer;
 
-  KeithleyDAQ6510_t daq("/dev/usbtmc0");
+  std::string ioPort = "/dev/usbtmc0";
+  if (argc==2) ioPort = argv[1];
+
+  std::cout << "test on " << ioPort << std::endl;
+
+  KeithleyDAQ6510_t daq(ioPort.c_str());
 
   std::cout << (int) daq.DeviceAvailable() << std::endl;
 
-  channels_t channels;
+  VKeithleyDAQ6510::channels_t channels;
   channels[0] = true;
   channels[1] = true;
   channels[2] = true;
@@ -58,10 +63,10 @@ int main()
 
   std::this_thread::sleep_for(2s);
 
-  reading_t data;
+  VKeithleyDAQ6510::reading_t data;
   daq.GetScanData(data);
 
-  for (reading_t::iterator it=data.begin();it!=data.end();++it) {
+  for (VKeithleyDAQ6510::reading_t::iterator it=data.begin();it!=data.end();++it) {
     unsigned int sensor;
     double temperature;
     double relativeTime;

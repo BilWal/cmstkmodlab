@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
-//               Copyright (C) 2011-2017 - The DESY CMS Group                  //
+//               Copyright (C) 2011-2022 - The DESY CMS Group                  //
 //                           All rights reserved                               //
 //                                                                             //
 //      The CMStkModLab source code is licensed under the GNU GPL v3.0.        //
@@ -58,13 +58,13 @@ AssemblyZFocusFinder::AssemblyZFocusFinder(const QString& output_dir_prepath, co
     return;
   }
 
-  focus_pointN_max_ = config->getValue<int>   ("AssemblyZFocusFinder_pointN_max", 200);
-  focus_pointN_     = config->getValue<int>   ("AssemblyZFocusFinder_pointN"    ,  50);
+  focus_pointN_max_ = config->getDefaultValue<int>   ("main", "AssemblyZFocusFinder_pointN_max", 200);
+  focus_pointN_     = config->getDefaultValue<int>   ("main", "AssemblyZFocusFinder_pointN"    ,  50);
 
-  focus_zrange_max_ = config->getValue<double>("AssemblyZFocusFinder_zrange_max", 3.0);
-  focus_zrange_     = config->getValue<double>("AssemblyZFocusFinder_zrange"    , 0.5);
+  focus_zrange_max_ = config->getDefaultValue<double>("main", "AssemblyZFocusFinder_zrange_max", 3.0);
+  focus_zrange_     = config->getDefaultValue<double>("main", "AssemblyZFocusFinder_zrange"    , 0.5);
 
-  focus_stepsize_min_ = config->getValue<double>("AssemblyZFocusFinder_stepsize_min", 0.005);
+  focus_stepsize_min_ = config->getDefaultValue<double>("main", "AssemblyZFocusFinder_stepsize_min", 0.005);
 
   v_zrelm_vals_.clear();
   v_focus_vals_.clear();
@@ -298,6 +298,8 @@ void AssemblyZFocusFinder::test_focus()
        << ": emitting signal \"focus(0, 0, " << dz << ", 0)\"";
 
     emit focus(0., 0., dz, 0.);
+
+    emit sig_update_progBar(int(zrelm_index_*100./v_zrelm_vals_.size())); //Update progress bar display
   }
   else
   {
@@ -382,6 +384,8 @@ void AssemblyZFocusFinder::test_focus()
        << ": emitting signal \"focus(0, 0, " << dz << ", 0)\"";
 
     emit focus(0., 0., dz, 0.);
+
+    emit sig_update_progBar(int(100)); //Update progress bar display
     // ------------------
   }
 
@@ -509,7 +513,7 @@ double AssemblyZFocusFinder::image_focus_value(const cv::Mat& img)
 //
 //  // Convert the image to grayscale
 //  cv::Mat img_gray;
-//  cv::cvtColor(img_gaus, img_gray, CV_BGR2GRAY);
+//  cv::cvtColor(img_gaus, img_gray, cv::COLOR_BGR2GRAY);
 
   // Apply laplacian function to GS image
   cv::Mat img_lap;

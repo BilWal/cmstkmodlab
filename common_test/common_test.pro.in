@@ -27,8 +27,7 @@ QMAKE = @qmake@
 macx {
   CONFIG+=x86_64
   QMAKE_CXXFLAGS += -stdlib=libc++
-  #QMAKE_MAC_SDK = macosx10.11
-  QMAKE_MACOSX_DEPLOYMENT_TARGET = 11.0
+  QMAKE_MACOSX_DEPLOYMENT_TARGET = 11.3
 }
 
 CONFIG+=c++17
@@ -78,4 +77,5 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 CONFIG   += console
 CONFIG   -= app_bundle
 
-SOURCES += main.cpp
+SOURCES += main.cc CommonTestMainWindow.cc
+

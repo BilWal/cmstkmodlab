@@ -11,10 +11,8 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <nqlogger.h>
-#include <ApplicationConfig.h>
 
 #include <AssemblyObjectFinderPatRec.h>
-#include <AssemblyParameters.h>
 #include <AssemblyUtilities.h>
 
 #include <iostream>
@@ -35,6 +33,8 @@ AssemblyObjectFinderPatRec::AssemblyObjectFinderPatRec(AssemblyThresholder* cons
   QObject(parent),
 
   thresholder_(thresholder),
+
+  config_(nullptr),
 
   output_dir_path_   (output_dir_path   .toStdString()),
   output_subdir_name_(output_subdir_name.toStdString()),
@@ -58,8 +58,8 @@ AssemblyObjectFinderPatRec::AssemblyObjectFinderPatRec(AssemblyThresholder* cons
   connect(this, SIGNAL(template_matching_request(Configuration, cv::Mat, cv::Mat, cv::Mat)), this, SLOT(template_matching(Configuration, cv::Mat, cv::Mat, cv::Mat)));
   // -----------
 
-  ApplicationConfig* config = ApplicationConfig::instance();
-  if(config == nullptr)
+  config_ = ApplicationConfig::instance();
+  if(config_ == nullptr)
   {
     NQLog("AssemblyObjectFinderPatRec", NQLog::Fatal) << "initialization error"
        << ": ApplicationConfig::instance() not initialized (null pointer), exiting constructor";
@@ -67,8 +67,8 @@ AssemblyObjectFinderPatRec::AssemblyObjectFinderPatRec(AssemblyThresholder* cons
     return;
   }
 
-  mm_per_pixel_row_ = config->getValue<double>("mm_per_pixel_row");
-  mm_per_pixel_col_ = config->getValue<double>("mm_per_pixel_col");
+  mm_per_pixel_row_ = config_->getValue<double>("main", "mm_per_pixel_row");
+  mm_per_pixel_col_ = config_->getValue<double>("main", "mm_per_pixel_col");
 
   NQLog("AssemblyObjectFinderPatRec", NQLog::Debug) << "constructed";
 }
@@ -151,17 +151,12 @@ void AssemblyObjectFinderPatRec::launch_PatRec(const AssemblyObjectFinderPatRec:
   // ----------
 
   // update template image
-  const cv::Mat img_templa = assembly::cv_imread(conf.template_filepath_, CV_LOAD_IMAGE_COLOR);
+  const cv::Mat img_templa = assembly::cv_imread(conf.template_filepath_, cv::IMREAD_COLOR);
 
   if(assembly::MatIsBlackAndWhite(img_templa) == false)
   {
-    NQLog("AssemblyObjectFinderPatRec", NQLog::Fatal) << "launch_PatRec"
-       << ": updated template image is not a binary image, no action taken";
-
-    NQLog("AssemblyObjectFinderPatRec", NQLog::Spam) << "launch_PatRec"
-       << ": emitting signal \"PatRec_exitcode(1)\"";
-
-    emit PatRec_exitcode(1);
+    NQLog("AssemblyObjectFinderPatRec", NQLog::Warning) << "launch_PatRec"
+       << ": updated template image is not a binary image, please check image";
   }
 
   // emit DBLogMessage("Starting Pattern Recognition");
@@ -413,7 +408,7 @@ void AssemblyObjectFinderPatRec::template_matching(const AssemblyObjectFinderPat
   cv::Mat img_templa_PatRec_gs;
   if(img_templa_PatRec.channels() > 1)
   {
-    cv::cvtColor(img_templa_PatRec, img_templa_PatRec_gs, CV_BGR2GRAY);
+    cv::cvtColor(img_templa_PatRec, img_templa_PatRec_gs, cv::COLOR_BGR2GRAY);
   }
   else
   {
@@ -423,8 +418,8 @@ void AssemblyObjectFinderPatRec::template_matching(const AssemblyObjectFinderPat
   // Template-Matching method for matchTemplate() routine of OpenCV
   // For SQDIFF and SQDIFF_NORMED, the best match is the lowest value; for all the other methods, the best match is the highest value.
   // REF https://docs.opencv.org/2.4/modules/imgproc/doc/object_detection.html?highlight=matchtemplate#matchtemplate
-  const int match_method = CV_TM_SQDIFF_NORMED;
-  const bool use_minFOM = ((match_method  == CV_TM_SQDIFF) || (match_method == CV_TM_SQDIFF_NORMED));
+  const int match_method = cv::TM_SQDIFF_NORMED;
+  const bool use_minFOM = ((match_method  == cv::TM_SQDIFF) || (match_method == cv::TM_SQDIFF_NORMED));
 
   NQLog("AssemblyObjectFinderPatRec", NQLog::Spam) << "template_matching" << ": initiated matching routine with angular scan";
 
@@ -627,9 +622,7 @@ void AssemblyObjectFinderPatRec::template_matching(const AssemblyObjectFinderPat
   //   in order to convert this to a normal XY ref-frame,
   //   we invert the sign of the value on the Y-axis.
   //
-  const AssemblyParameters* const params = AssemblyParameters::instance(false);
-
-  const double angle_FromCameraXYtoRefFrameXY_deg = params->get("AngleOfCameraFrameInRefFrame_dA");
+  const double angle_FromCameraXYtoRefFrameXY_deg = config_->getValue<double>("parameters", "AngleOfCameraFrameInRefFrame_dA");
 
   const double dX_0 = +1.0 * (best_matchLoc.x - (img_master_copy.cols / 2.0)) * mm_per_pixel_col_;
   const double dY_0 = -1.0 * (best_matchLoc.y - (img_master_copy.rows / 2.0)) * mm_per_pixel_row_;
@@ -709,7 +702,7 @@ void AssemblyObjectFinderPatRec::PatRec(double& fom, cv::Point& match_loc, const
 
   minMaxLoc(result_mat, &minVal, &maxVal, &minLoc, &maxLoc, cv::Mat());
 
-  const bool use_minFOM = ((match_method  == CV_TM_SQDIFF) || (match_method == CV_TM_SQDIFF_NORMED));
+  const bool use_minFOM = ((match_method  == cv::TM_SQDIFF) || (match_method == cv::TM_SQDIFF_NORMED));
 
   if(use_minFOM){ match_loc = minLoc; fom = minVal; }
   else          { match_loc = maxLoc; fom = maxVal; }

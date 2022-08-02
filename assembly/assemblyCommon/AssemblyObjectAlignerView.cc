@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
-//               Copyright (C) 2011-2017 - The DESY CMS Group                  //
+//               Copyright (C) 2011-2022 - The DESY CMS Group                  //
 //                           All rights reserved                               //
 //                                                                             //
 //      The CMStkModLab source code is licensed under the GNU GPL v3.0.        //
@@ -11,7 +11,6 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <nqlogger.h>
-#include <ApplicationConfig.h>
 
 #include <AssemblyObjectAlignerView.h>
 #include <AssemblyUtilities.h>
@@ -73,6 +72,8 @@ AssemblyObjectAlignerView::AssemblyObjectAlignerView(QWidget* parent)
  , button_alignerEmergencyStop_(nullptr)
 
  , finder_connected_(false)
+
+ , config_(nullptr)
 {
   QVBoxLayout* layout = new QVBoxLayout;
   this->setLayout(layout);
@@ -80,7 +81,7 @@ AssemblyObjectAlignerView::AssemblyObjectAlignerView(QWidget* parent)
   QToolBox* toolbox = new QToolBox;
   layout->addWidget(toolbox);
 
-  ApplicationConfig* config = ApplicationConfig::instance();
+  config_ = ApplicationConfig::instance();
 
   // Configuration + Execution
 
@@ -129,8 +130,10 @@ AssemblyObjectAlignerView::AssemblyObjectAlignerView(QWidget* parent)
   connect(alignm_PSS_radbu_, SIGNAL(toggled(bool)), alignm_PSS_dY_label , SLOT(setEnabled(bool)));
   connect(alignm_PSS_radbu_, SIGNAL(toggled(bool)), alignm_PSS_dY_linee_, SLOT(setEnabled(bool)));
 
-  assembly::QLineEdit_setText(alignm_PSS_dX_linee_, config->getValue<double>("AssemblyObjectAlignerView_PSS_deltaX", 0.));
-  assembly::QLineEdit_setText(alignm_PSS_dY_linee_, config->getValue<double>("AssemblyObjectAlignerView_PSS_deltaY", 0.));
+  connect(alignm_PSS_radbu_, SIGNAL(toggled(bool)), this, SLOT(update_templates(bool)));
+
+  assembly::QLineEdit_setText(alignm_PSS_dX_linee_, config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PSS_deltaX", 0.));
+  assembly::QLineEdit_setText(alignm_PSS_dY_linee_, config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PSS_deltaY", 0.));
 
   QHBoxLayout* alignm_PSP_lay = new QHBoxLayout;
   alignm_dXY_lay->addLayout(alignm_PSP_lay);
@@ -157,8 +160,10 @@ AssemblyObjectAlignerView::AssemblyObjectAlignerView(QWidget* parent)
   connect(alignm_PSP_radbu_, SIGNAL(toggled(bool)), alignm_PSP_dY_label , SLOT(setEnabled(bool)));
   connect(alignm_PSP_radbu_, SIGNAL(toggled(bool)), alignm_PSP_dY_linee_, SLOT(setEnabled(bool)));
 
-  assembly::QLineEdit_setText(alignm_PSP_dX_linee_, config->getValue<double>("AssemblyObjectAlignerView_PSP_deltaX", 0.));
-  assembly::QLineEdit_setText(alignm_PSP_dY_linee_, config->getValue<double>("AssemblyObjectAlignerView_PSP_deltaY", 0.));
+  connect(alignm_PSP_radbu_, SIGNAL(toggled(bool)), this, SLOT(update_templates(bool)));
+
+  assembly::QLineEdit_setText(alignm_PSP_dX_linee_, config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PSP_deltaX", 0.));
+  assembly::QLineEdit_setText(alignm_PSP_dY_linee_, config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PSP_deltaY", 0.));
 
   alignm_objcfg_lay->addSpacing(10);
 
@@ -271,7 +276,7 @@ AssemblyObjectAlignerView::AssemblyObjectAlignerView(QWidget* parent)
   alignm_angmax_dontIter_lay->addWidget(alignm_angmax_dontIter_linee_, 10, Qt::AlignLeft);
 //  alignm_angmax_dontIter_lay->addSpacing(10);
 
-  assembly::QLineEdit_setText(alignm_angmax_dontIter_linee_, config->getValue<double>("AssemblyObjectAlignerView_angle_max_dontIter", 0.50));
+  assembly::QLineEdit_setText(alignm_angmax_dontIter_linee_, config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_angle_max_dontIter", 0.50));
 
   // parameter: maximum angle to validate alignment
   QHBoxLayout* alignm_angmax_complete_lay = new QHBoxLayout;
@@ -285,7 +290,7 @@ AssemblyObjectAlignerView::AssemblyObjectAlignerView(QWidget* parent)
   alignm_angmax_complete_lay->addWidget(alignm_angmax_complete_linee_, 10, Qt::AlignLeft);
 //  alignm_angmax_complete_lay->addSpacing(10);
 
-  assembly::QLineEdit_setText(alignm_angmax_complete_linee_, config->getValue<double>("AssemblyObjectAlignerView_angle_max_complete", 0.01));
+  assembly::QLineEdit_setText(alignm_angmax_complete_linee_, config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_angle_max_complete", 0.01));
 
   // ----------
 
@@ -303,17 +308,17 @@ AssemblyObjectAlignerView::AssemblyObjectAlignerView(QWidget* parent)
   patrecOne_wid_ = new AssemblyObjectFinderPatRecWidget;
   patrecOne_wid_->setToolTip("Pattern Recognition Configuration #1 [Bottom-Left Marker]");
 
-  if(config != nullptr)
+  if(config_ != nullptr)
   {
-    const std::string fpath = config->getValue<std::string>("AssemblyObjectAlignerView_PatRec1_template_fpath", "");
+    const std::string fpath = config_->getDefaultValue<std::string>("main", "AssemblyObjectAlignerView_PatRec_PSP1_template_fpath", "");
     if(fpath != ""){ patrecOne_wid_->load_image_template_from_path(QString::fromStdString(Config::CMSTkModLabBasePath+"/"+fpath)); }
 
-    assembly::QLineEdit_setText(patrecOne_wid_->threshold_lineEdit()        , config->getValue<int>("AssemblyObjectAlignerView_PatRec1_threshold"        , 100));
-    assembly::QLineEdit_setText(patrecOne_wid_->adaptiveThreshold_lineEdit(), config->getValue<int>("AssemblyObjectAlignerView_PatRec1_adaptiveThreshold", 587));
+    assembly::QLineEdit_setText(patrecOne_wid_->threshold_lineEdit()        , config_->getDefaultValue<int>("main", "AssemblyObjectAlignerView_PatRec_threshold"        , 100));
+    assembly::QLineEdit_setText(patrecOne_wid_->adaptiveThreshold_lineEdit(), config_->getDefaultValue<int>("main", "AssemblyObjectAlignerView_PatRec_adaptiveThreshold", 587));
 
-    assembly::QLineEdit_setText(patrecOne_wid_->angles_prescan_lineEdit()   , config->getValue<double>("AssemblyObjectAlignerView_PatRec1_angles_prescan" , 0));
-    assembly::QLineEdit_setText(patrecOne_wid_->angles_finemax_lineEdit()   , config->getValue<double>("AssemblyObjectAlignerView_PatRec1_angles_finemax" , 2));
-    assembly::QLineEdit_setText(patrecOne_wid_->angles_finestep_lineEdit()  , config->getValue<double>("AssemblyObjectAlignerView_PatRec1_angles_finestep", 0.2));
+    assembly::QLineEdit_setText(patrecOne_wid_->angles_prescan_lineEdit()   , config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PatRec_angles_prescan" , 0));
+    assembly::QLineEdit_setText(patrecOne_wid_->angles_finemax_lineEdit()   , config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PatRec_angles_finemax" , 2));
+    assembly::QLineEdit_setText(patrecOne_wid_->angles_finestep_lineEdit()  , config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PatRec_angles_finestep", 0.2));
   }
 
   patrecOne_cfg_box->setLayout(patrecOne_wid_->layout());
@@ -327,17 +332,17 @@ AssemblyObjectAlignerView::AssemblyObjectAlignerView(QWidget* parent)
   patrecTwo_wid_ = new AssemblyObjectFinderPatRecWidget;
   patrecTwo_wid_->setToolTip("Pattern Recognition Configuration #2 [Top-Right Marker]");
 
-  if(config != nullptr)
+  if(config_ != nullptr)
   {
-    const std::string fpath = config->getValue<std::string>("AssemblyObjectAlignerView_PatRec2_template_fpath", "");
+    const std::string fpath = config_->getDefaultValue<std::string>("main", "AssemblyObjectAlignerView_PatRec_PSP2_template_fpath", "");
     if(fpath != ""){ patrecTwo_wid_->load_image_template_from_path(QString::fromStdString(Config::CMSTkModLabBasePath+"/"+fpath)); }
 
-    assembly::QLineEdit_setText(patrecTwo_wid_->threshold_lineEdit()        , config->getValue<int>("AssemblyObjectAlignerView_PatRec2_threshold"        , 100));
-    assembly::QLineEdit_setText(patrecTwo_wid_->adaptiveThreshold_lineEdit(), config->getValue<int>("AssemblyObjectAlignerView_PatRec2_adaptiveThreshold", 587));
+    assembly::QLineEdit_setText(patrecTwo_wid_->threshold_lineEdit()        , config_->getDefaultValue<int>("main", "AssemblyObjectAlignerView_PatRec_threshold"        , 100));
+    assembly::QLineEdit_setText(patrecTwo_wid_->adaptiveThreshold_lineEdit(), config_->getDefaultValue<int>("main", "AssemblyObjectAlignerView_PatRec_adaptiveThreshold", 587));
 
-    assembly::QLineEdit_setText(patrecTwo_wid_->angles_prescan_lineEdit()   , config->getValue<double>("AssemblyObjectAlignerView_PatRec2_angles_prescan" , 0));
-    assembly::QLineEdit_setText(patrecTwo_wid_->angles_finemax_lineEdit()   , config->getValue<double>("AssemblyObjectAlignerView_PatRec2_angles_finemax" , 2));
-    assembly::QLineEdit_setText(patrecTwo_wid_->angles_finestep_lineEdit()  , config->getValue<double>("AssemblyObjectAlignerView_PatRec2_angles_finestep", 0.2));
+    assembly::QLineEdit_setText(patrecTwo_wid_->angles_prescan_lineEdit()   , config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PatRec_angles_prescan" , 0));
+    assembly::QLineEdit_setText(patrecTwo_wid_->angles_finemax_lineEdit()   , config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PatRec_angles_finemax" , 2));
+    assembly::QLineEdit_setText(patrecTwo_wid_->angles_finestep_lineEdit()  , config_->getDefaultValue<double>("main", "AssemblyObjectAlignerView_PatRec_angles_finestep", 0.2));
   }
 
   patrecTwo_cfg_box->setLayout(patrecTwo_wid_->layout());
@@ -513,7 +518,7 @@ void AssemblyObjectAlignerView::updateImage(const int stage, const QString& file
 {
   NQLog("AssemblyObjectAlignerView", NQLog::Spam) << "updateImage(" << stage << ", file=" << filename << ")";
 
-  const cv::Mat img = assembly::cv_imread(filename, CV_LOAD_IMAGE_UNCHANGED);
+  const cv::Mat img = assembly::cv_imread(filename, cv::IMREAD_UNCHANGED);
 
   this->updateImage(stage, img);
 
@@ -661,6 +666,23 @@ void AssemblyObjectAlignerView::update_autofocusing_checkbox(const int state)
 
 void AssemblyObjectAlignerView::transmit_configuration()
 {
+  QMessageBox* msgBox = new QMessageBox;
+  msgBox->setStyleSheet("QLabel{min-width: 300px;}");
+  msgBox->setInformativeText("Are you sure you selected the correct template images and defined the relevant B/W thresholds?");
+  msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+  msgBox->setDefaultButton(QMessageBox::Yes);
+  int ret = msgBox->exec();
+  switch(ret)
+  {
+    case QMessageBox::Yes:
+      break;
+    case QMessageBox::No:
+      NQLog("AssemblyObjectAlignerView", NQLog::Critical) << "transmit_configuration"
+      << ": abort start of alignment procedure";
+      return;
+    default: return;
+  }
+
   bool valid_conf(false);
 
   const auto& conf = this->get_configuration(valid_conf);
@@ -875,7 +897,53 @@ AssemblyObjectAligner::Configuration AssemblyObjectAlignerView::get_configuratio
 void AssemblyObjectAlignerView::display_infoTab()
 {
     QMessageBox::information(this, tr("Information - Alignment"),
-            tr("<p>There is no available information about the content of this tab yet.</p>"));
+            tr("<p>Click 'Align object' to run the sensor alignment routine.</p>"
+            "<p>Make sure to select the relevant sensor type, template images for PatRec, and B/W thresholds.</p>"
+    ));
 
     return;
+}
+
+//-- Set the mode to PSP
+void AssemblyObjectAlignerView::set_alignmentMode_PSP()
+{
+    alignm_PSS_radbu_->setEnabled(true); //Keep enabled, such that the user can still select PSS if needed
+    alignm_PSS_radbu_->setChecked(false);
+    alignm_PSP_radbu_->setEnabled(true);
+    alignm_PSP_radbu_->setChecked(true);
+
+    return;
+}
+
+//-- Set the mode to PSS
+void AssemblyObjectAlignerView::set_alignmentMode_PSS()
+{
+    alignm_PSP_radbu_->setEnabled(true); //Keep enabled, such that the user can still select PSP if needed
+    alignm_PSP_radbu_->setChecked(false);
+    alignm_PSS_radbu_->setEnabled(true);
+    alignm_PSS_radbu_->setChecked(true);
+
+    return;
+}
+
+void AssemblyObjectAlignerView::update_templates(const bool checked)
+{
+  QRadioButton* ptr_qedit = qobject_cast<QRadioButton*>(sender());
+  std::string f_path_1;
+  std::string f_path_2;
+
+  if(ptr_qedit == alignm_PSS_radbu_ && checked)
+  {
+    f_path_1 = config_->getDefaultValue<std::string>("main", "AssemblyObjectAlignerView_PatRec_PSS1_template_fpath", "");
+    f_path_2 = config_->getDefaultValue<std::string>("main", "AssemblyObjectAlignerView_PatRec_PSS2_template_fpath", "");
+  } else if (ptr_qedit == alignm_PSP_radbu_ && checked)
+  {
+    f_path_1 = config_->getDefaultValue<std::string>("main", "AssemblyObjectAlignerView_PatRec_PSP1_template_fpath", "");
+    f_path_2 = config_->getDefaultValue<std::string>("main", "AssemblyObjectAlignerView_PatRec_PSP2_template_fpath", "");
+  }
+
+  patrecOne_wid_->load_image_template_from_path(QString::fromStdString(Config::CMSTkModLabBasePath+"/"+f_path_1));
+  patrecTwo_wid_->load_image_template_from_path(QString::fromStdString(Config::CMSTkModLabBasePath+"/"+f_path_1));
+
+  return;
 }

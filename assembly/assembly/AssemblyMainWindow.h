@@ -47,7 +47,6 @@ typedef AssemblyUEyeModel AssemblyUEyeModel_t;
 #include <AssemblyMultiPickupTester.h>
 #include <AssemblyToolboxView.h>
 #include <AssemblySmartMotionManager.h>
-#include <AssemblyParameters.h>
 #include <AssemblyParametersView.h>
 #include <AssemblyHardwareControlView.h>
 #include <LStepExpressModel.h>
@@ -91,6 +90,7 @@ class AssemblyMainWindow : public QMainWindow
   {
       disconnect_otherSlots();
   }
+  void switchAndUpdate_alignment_tab(bool);
 
 
  public slots:
@@ -126,6 +126,9 @@ class AssemblyMainWindow : public QMainWindow
   void quit_thread(QThread*, const QString&) const;
   void quit();
 
+  void update_alignment_tab_psp();
+  void update_alignment_tab_pss();
+
  signals:
 
   void images_ON();
@@ -148,10 +151,14 @@ class AssemblyMainWindow : public QMainWindow
 
   void display_info();
 
+  void set_alignmentMode_PSP_request();
+  void set_alignmentMode_PSS_request();
 
  protected slots:
 
   void liveUpdate();
+
+  void messageBox_restartMotionStage();
 
  protected:
 
@@ -189,7 +196,6 @@ class AssemblyMainWindow : public QMainWindow
 
   AssemblySmartMotionManager* smart_motion_;
 
-  AssemblyParameters* params_;
 
   // Views
   QToolBar*   toolBar_;
@@ -227,6 +233,8 @@ class AssemblyMainWindow : public QMainWindow
   // timing
   double testTimerCount_;
   QTimer* liveTimer_;
+
+  int idx_alignment_tab;
 };
 
 #endif // ASSEMBLYMAINWINDOW_H

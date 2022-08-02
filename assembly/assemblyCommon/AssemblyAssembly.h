@@ -27,7 +27,7 @@
 #include <RelayCardManager.h>
 
 #include <AssemblySmartMotionManager.h>
-#include <AssemblyParameters.h>
+#include <ApplicationConfig.h>
 
 #include <vector>
 
@@ -40,8 +40,6 @@ class AssemblyAssembly : public QObject
   explicit AssemblyAssembly(const LStepExpressMotionManager* const, const RelayCardManager* const, const AssemblySmartMotionManager* const smart_motion=nullptr, QObject* parent=nullptr);
 
   virtual ~AssemblyAssembly() {}
-
-  AssemblyParameters* parameters() const;
 
   const LStepExpressMotionManager* motion() const;
 
@@ -57,6 +55,8 @@ class AssemblyAssembly : public QObject
   const RelayCardManager* const vacuum_;
   
   const AssemblySmartMotionManager* const smart_motion_;
+
+  const ApplicationConfig* config_;
 
   int vacuum_pickup_;
   int vacuum_spacer_;
@@ -103,9 +103,6 @@ class AssemblyAssembly : public QObject
 
   void ApplyPSPToPSSXYOffset_start();
   void ApplyPSPToPSSXYOffset_finish();
-
-  void RegisterPSSPlusSpacersToMaPSAPosition_start();
-  void RegisterPSSPlusSpacersToMaPSAPosition_finish();
 
   void GoFromPSSPlusSpacersToMaPSAPositionToGluingStageRefPointXY_start();
   void GoFromPSSPlusSpacersToMaPSAPositionToGluingStageRefPointXY_finish();
@@ -156,6 +153,12 @@ class AssemblyAssembly : public QObject
 
   void DisableVacuumStage_start();
   void DisableVacuumStage_finish();
+  // ---------
+
+  // others
+
+  void RegisterPSSPlusSpacersToMaPSAPosition_start();
+  void RegisterPSSPlusSpacersToMaPSAPosition_finish();
   // ---------
 
  signals:

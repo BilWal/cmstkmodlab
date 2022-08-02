@@ -76,19 +76,6 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
   }
   // ----------
 
-  // step: Enable Vacuum on MaPSA
-  {
-    ++assembly_step_N;
-
-    AssemblyAssemblyActionWidget* tmp_wid = new AssemblyAssemblyActionWidget;
-    tmp_wid->label()->setText(QString::number(assembly_step_N));
-    tmp_wid->button()->setText("Enable Vacuum on MaPSA");
-    PSPToBasep_lay->addWidget(tmp_wid);
-
-    tmp_wid->connect_action(assembly, SLOT(EnableVacuumBaseplate_start()), SIGNAL(EnableVacuumBaseplate_finished()));
-  }
-  // ----------
-
   // step: Go To Measurement Position on MaPSA
   {
     ++assembly_step_N;
@@ -102,14 +89,32 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
   }
   // ----------
 
+  // step: Enable Vacuum on MaPSA
+  {
+    ++assembly_step_N;
+
+    AssemblyAssemblyActionWidget* tmp_wid = new AssemblyAssemblyActionWidget;
+    tmp_wid->label()->setText(QString::number(assembly_step_N));
+    tmp_wid->button()->setText("Enable Vacuum on MaPSA");
+    PSPToBasep_lay->addWidget(tmp_wid);
+
+    tmp_wid->connect_action(assembly, SLOT(EnableVacuumBaseplate_start()), SIGNAL(EnableVacuumBaseplate_finished()));
+  }
+  // ----------
+
   // step: Align MaPSA to Motion Stage
   {
     ++assembly_step_N;
 
-    AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
+    //Changed: plain text -> button
+    // AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
+    AssemblyAssemblyActionWidget* tmp_wid = new AssemblyAssemblyActionWidget;
     tmp_wid->label()->setText(QString::number(assembly_step_N));
-    tmp_wid->text()->setText("Align MaPSA to Motion Stage (Go to \"Alignment\" Tab and select \"PS-p Sensor\")");
+    // tmp_wid->text()->setText("Align MaPSA to Motion Stage (Go to \"Alignment\" Tab and select \"PS-p Sensor\")");
+    tmp_wid->button()->setText("Align MaPSA to Motion Stage (Go to \"Alignment\" Tab and select \"PS-p Sensor\")");
     PSPToBasep_lay->addWidget(tmp_wid);
+
+    tmp_wid->connect_action(assembly, SLOT(switchToAlignmentTab_PSP()), SIGNAL(switchToAlignmentTab_PSP_request()));
   }
   // ----------
 
@@ -184,7 +189,7 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
 
     AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
     tmp_wid->label()->setText(QString::number(assembly_step_N));
-    tmp_wid->text()->setText("Dispense (Slow+Fast) Glue on Baseplate and Place it on Assembly Platform");
+    tmp_wid->text()->setText("Dispense (Slow+Fast) Glue on Baseplate and Place it on Assembly Platform with Pins");
     PSPToBasep_lay->addWidget(tmp_wid);
   }
   // ----------
@@ -323,6 +328,19 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
   }
   // ----------
 
+  // step: Go To Measurement Position on PS-s
+  {
+    ++assembly_step_N;
+
+    AssemblyAssemblyActionWidget* tmp_wid = new AssemblyAssemblyActionWidget;
+    tmp_wid->label()->setText(QString::number(assembly_step_N));
+    tmp_wid->button()->setText("Go To Measurement Position on PS-s");
+    PSSToSpacers_lay->addWidget(tmp_wid);
+
+    tmp_wid->connect_action(assembly, SLOT(GoToSensorMarkerPreAlignment_start()), SIGNAL(GoToSensorMarkerPreAlignment_finished()));
+  }
+  // ----------
+  
   // step: Enable Vacuum on PS-s
   {
     ++assembly_step_N;
@@ -336,27 +354,19 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
   }
   // ----------
 
-  // step: Go To Measurement Position on PS-s
-  {
-    ++assembly_step_N;
-
-    AssemblyAssemblyActionWidget* tmp_wid = new AssemblyAssemblyActionWidget;
-    tmp_wid->label()->setText(QString::number(assembly_step_N));
-    tmp_wid->button()->setText("Go To Measurement Position on PS-s");
-    PSSToSpacers_lay->addWidget(tmp_wid);
-
-    tmp_wid->connect_action(assembly, SLOT(GoToSensorMarkerPreAlignment_start()), SIGNAL(GoToSensorMarkerPreAlignment_finished()));
-  }
-  // ----------
-
   // step: Align PS-s to Motion Stage
   {
     ++assembly_step_N;
 
-    AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
+    //Changed: plain text -> button
+    // AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
+    AssemblyAssemblyActionWidget* tmp_wid = new AssemblyAssemblyActionWidget;
     tmp_wid->label()->setText(QString::number(assembly_step_N));
-    tmp_wid->text()->setText("Align PS-s to Motion Stage (Go to \"Alignment\" Tab and select \"PS-s Sensor\")");
+    // tmp_wid->text()->setText("Align PS-s to Motion Stage (Go to \"Alignment\" Tab and select \"PS-s Sensor\")");
+    tmp_wid->button()->setText("Align PS-s to Motion Stage (Go to \"Alignment\" Tab and select \"PS-s Sensor\")");
     PSSToSpacers_lay->addWidget(tmp_wid);
+
+    tmp_wid->connect_action(assembly, SLOT(switchToAlignmentTab_PSS()), SIGNAL(switchToAlignmentTab_PSS_request()));
   }
   // ----------
 
@@ -425,17 +435,6 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
   }
   // ----------
 
-  // step: Dispense Glue on Spacers and Place them on Assembly Platform
-  {
-    ++assembly_step_N;
-
-    AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
-    tmp_wid->label()->setText(QString::number(assembly_step_N));
-    tmp_wid->text()->setText("Dispense Glue on Spacers and Place them on Assembly Platform");
-    PSSToSpacers_lay->addWidget(tmp_wid);
-  }
-  // ----------
-
   // step: Go To XYA Position To Glue PS-s to Spacers
   {
     ++assembly_step_N;
@@ -446,6 +445,17 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
     PSSToSpacers_lay->addWidget(tmp_wid);
 
     tmp_wid->connect_action(assembly, SLOT(GoToXYAPositionToGluePSSToSpacers_start()), SIGNAL(GoToXYAPositionToGluePSSToSpacers_finished()));
+  }
+  // ----------
+  
+  // step: Dispense Glue on Spacers and Place them on Assembly Platform
+  {
+    ++assembly_step_N;
+
+    AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
+    tmp_wid->label()->setText(QString::number(assembly_step_N));
+    tmp_wid->text()->setText("Dispense Glue on Spacers and Place them on Assembly Platform");
+    PSSToSpacers_lay->addWidget(tmp_wid);
   }
   // ----------
 
@@ -575,10 +585,15 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
   {
     ++assembly_step_N;
 
-    AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
+    //Changed: plain text -> button
+    // AssemblyAssemblyTextWidget* tmp_wid = new AssemblyAssemblyTextWidget;
+    AssemblyAssemblyActionWidget* tmp_wid = new AssemblyAssemblyActionWidget;
     tmp_wid->label()->setText(QString::number(assembly_step_N));
-    tmp_wid->text()->setText("Align MaPSA (Go to \"Alignment\" Tab and select \"PS-p Sensor\")");
+    // tmp_wid->text()->setText("Align MaPSA (Go to \"Alignment\" Tab and select \"PS-p Sensor\")");
+    tmp_wid->button()->setText("Align MaPSA (Go to \"Alignment\" Tab and select \"PS-p Sensor\")");
     PSSToMaPSA_lay->addWidget(tmp_wid);
+
+    tmp_wid->connect_action(assembly, SLOT(switchToAlignmentTab_PSP()), SIGNAL(switchToAlignmentTab_PSP_request()));
   }
   // ----------
 
@@ -746,6 +761,8 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
     tmp_wid->label()->setText(QString::number(assembly_step_N));
     tmp_wid->text()->setText("Remove PS Module from Assembly Platform");
     PSSToMaPSA_lay->addWidget(tmp_wid);
+
+    tmp_wid->connect_check_action(assembly, SLOT(AssemblyCompleted_start()));
   }
   // ----------
 
@@ -759,7 +776,9 @@ AssemblyAssemblyV2View::AssemblyAssemblyV2View(const QObject* const assembly, QW
 void AssemblyAssemblyV2View::display_infoTab()
 {
     QMessageBox::information(this, tr("Information - Assembly"),
-            tr("<p>There is no available information about the content of this tab yet.</p>"));
+            tr("<p>List of sequential steps to be performed to complete the automated assembly procedure.</p>"
+            "<p>Make sure the 'SmartMove' checkbox is ticked, to priorize XYA/Z movements and decompose Z-movements.</p>"
+        ));
 
     return;
 }

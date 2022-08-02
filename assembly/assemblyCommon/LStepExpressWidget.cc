@@ -122,8 +122,10 @@ LStepExpressWidget::LStepExpressWidget(LStepExpressModel* model, QWidget* parent
     connect(model_, SIGNAL(motionStarted())          , this, SLOT(motionStarted()));
     connect(model_, SIGNAL(motionFinished())         , this, SLOT(motionFinished()));
 
-    connect(buttonOrigin_       , SIGNAL(clicked()), model_, SLOT(moveAbsolute()));
-    connect(buttonCalibrate_    , SIGNAL(clicked()), model_, SLOT(calibrate()));
+    //connect(buttonOrigin_       , SIGNAL(clicked()), model_, SLOT(moveAbsolute()));
+    connect(buttonOrigin_       , SIGNAL(clicked()), this  , SIGNAL(moveToOrigin_request())); //New signal/slot to connect the Origin button with the manager (where XYA/Z priorities are implemented) rather than directly via the model
+    connect(buttonCalibrate_    , SIGNAL(clicked()), this, SLOT(confirmCalibrate())); //Changed: clicking 'Calibrate' pops-up a GUI message, and the calibration is only performed upon confirmation from the user
+    connect(this, SIGNAL(startCalibrate()), model_, SLOT(calibrate()));
     connect(buttonEmergencyStop_, SIGNAL(clicked()), model_, SLOT(emergencyStop()));
     connect(buttonClearQueue_   , SIGNAL(clicked()), this  , SIGNAL(clearQueue_request()));
     connect(buttonRestart_      , SIGNAL(clicked()), this  , SLOT(restart()));
@@ -356,10 +358,10 @@ void LStepExpressWidget::restart()
           restart_step_ = 1;
         }
       }
-      else //if(axes_enabled == false)
+      else //if(axes_ready == false)
       {
         NQLog("LStepExpressWidget", NQLog::Spam) << "restart [step=" << restart_step_ << "]"
-           << ": axes NOT ENABLED (enabled"
+           << ": axes NOT READY (enabled"
            << ": x=" << x_enabled
            << ", y=" << y_enabled
            << ", z=" << z_enabled
@@ -443,14 +445,32 @@ void LStepExpressWidget::restart()
     if(restart_timer_){ delete restart_timer_; restart_timer_ = nullptr; }
 
     // re-enable widget
-    this->setEnabled(true);
-
-    // reset restart variables
-    restart_completed_ = false;
+    if(restart_completed_) this->setEnabled(true);
 
     restart_attempts_ = 0;
 
     restart_step_ = 0;
+
+    if(!restart_completed_)
+    {
+      QMessageBox* msgBox = new QMessageBox;
+      msgBox->setStyleSheet("QLabel{min-width: 400px;}");
+      msgBox->setInformativeText("Restart of motion stage failed!\nWould you like to try again?");
+      msgBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+      msgBox->setDefaultButton(QMessageBox::Yes);
+      int ret = msgBox->exec();
+      switch(ret)
+      {
+	case QMessageBox::No: break;
+        case QMessageBox::Yes:
+          restart_step_ = 0;
+          this->restart();
+        default: return;
+      }
+    }
+
+    // reset restart variables
+    restart_completed_ = false;
 
     NQLog("LStepExpressWidget", NQLog::Spam) << "restart"
        << ": emitting signal \"restart_completed\"";
@@ -505,6 +525,29 @@ void LStepExpressWidget::enableMotionTools(const bool enable)
 void LStepExpressWidget::disableMotionTools(const bool disable)
 {
   this->enableMotionTools(!disable);
+}
+
+//-- Changed: clicking 'Calibrate' pops-up a GUI message, and the calibration is only performed upon confirmation from the user
+void LStepExpressWidget::confirmCalibrate()
+{
+    QMessageBox* msgBox = new QMessageBox;
+    msgBox->setInformativeText("Recalibrate the motion stage ?");
+    msgBox->setStandardButtons(QMessageBox::No | QMessageBox::Yes);
+    msgBox->setDefaultButton(QMessageBox::No);
+    int ret = msgBox->exec();
+    switch(ret)
+    {
+      case QMessageBox::No: return; //Exit
+      case QMessageBox::Yes: break; //Continue function execution
+      default: return; //Exit
+    }
+
+	NQLog("LStepExpressWidget", NQLog::Spam) << "confirmCalibrate"
+     << ": emitting signal \"startCalibrate\"";
+
+    emit startCalibrate(); //Emit signal to start the actual MS calibration
+
+    return;
 }
 // ============================================================================
 

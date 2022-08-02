@@ -19,7 +19,6 @@
 #include <AssemblyMainWindow.h>
 #include <AssemblyLogFileController.h>
 #include <AssemblyLogFileView.h>
-#include <AssemblyParameters.h>
 #include <AssemblyUtilities.h>
 #include <string>
 
@@ -31,9 +30,8 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
   QMainWindow(parent),
 
   // Low-Level Controllers (Motion, Camera, Vacuum)
-
-	relayCardModel_(nullptr),
-	relayCardManager_(nullptr),
+  relayCardModel_(nullptr),
+  relayCardManager_(nullptr),
 
 
   motion_model_(nullptr),
@@ -63,8 +61,6 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
   finder_thread_(nullptr),
 
   smart_motion_(nullptr),
-
-  params_(nullptr),
 
   // Views
   toolBar_(nullptr),
@@ -112,11 +108,11 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
     /// Parameters
     ///   * instance created up here, so controllers can access it
-    params_ = AssemblyParameters::instance(config->getValue<std::string>("AssemblyParameters_file_path"));
-    if(params_->isValidConfig() == false)
-    {
+    try{
+      config->append(config->getValue<std::string>("main", "AssemblyParameters_file_path"), "parameters");
+    } catch (...) {
       NQLog("AssemblyMainWindow", NQLog::Fatal) << "\e[1;31m-------------------------------------------------------------------------------------------------------\e[0m";
-      NQLog("AssemblyMainWindow", NQLog::Fatal) << "\e[1;31mInitialization error: AssemblyParameters::instance() is invalid ! Abort !\e[0m";
+      NQLog("AssemblyMainWindow", NQLog::Fatal) << "\e[1;31mInitialization error: ApplicationConfig::append(\"parameters\") is invalid ! Abort !\e[0m";
       NQLog("AssemblyMainWindow", NQLog::Fatal) << "\e[1;31m-------------------------------------------------------------------------------------------------------\e[0m";
 
       return;
@@ -125,9 +121,9 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
     /// Motion
     motion_model_ = new LStepExpressModel(
-      config->getValue<std::string>("LStepExpressDevice"),
-      config->getValue<std::string>("LStepExpressDevice_ver"),
-      config->getValue<std::string>("LStepExpressDevice_iver"),
+      config->getValue<std::string>("main", "LStepExpressDevice"),
+      config->getValue<std::string>("main", "LStepExpressDevice_ver"),
+      config->getValue<std::string>("main", "LStepExpressDevice_iver"),
       1000,
       1000
     );
@@ -137,6 +133,8 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
     motion_thread_  = new LStepExpressMotionThread(motion_manager_, this);
     motion_thread_->start();
+
+    connect(motion_manager_, SIGNAL(restartMotionStage_request()), this, SLOT(messageBox_restartMotionStage())); //Display a pop-up GUI message whenever the MS gets automatically restarted
     /// -------------------
 
     /// Camera
@@ -157,12 +155,12 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
 
     /// Vacuum Manager
-    std::string relayCardDevice = config->getValue<std::string>("RelayCardDevice");
+    std::string relayCardDevice = config->getValue<std::string>("main", "RelayCardDevice");
     if (relayCardDevice=="Velleman")
     {
-    	relayCardModel_ = new VellemanModel(config->getValue<std::string>("VellemanDevice"));
+    	relayCardModel_ = new VellemanModel(config->getValue<std::string>("main", "VellemanDevice"));
     } else {
-    	relayCardModel_ = new ConradModel(config->getValue<std::string>("ConradDevice"));
+    	relayCardModel_ = new ConradModel(config->getValue<std::string>("main", "ConradDevice"));
     }
 
     relayCardManager_ = new RelayCardManager(relayCardModel_);
@@ -191,6 +189,8 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
     connect(image_view_   , SIGNAL(autofocus_config(double, int)), zfocus_finder_, SLOT(update_focus_config(double, int)));
 
     image_view_->update_autofocus_config(zfocus_finder_->zrange(), zfocus_finder_->points());
+
+    connect(zfocus_finder_, SIGNAL(sig_update_progBar(int)), image_view_, SLOT(update_progBar(int)));
 
     NQLog("AssemblyMainWindow", NQLog::Message) << "added view " << tabname_Image;
     // ---------------------------------------------------------
@@ -236,7 +236,7 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
     const QString tabname_Alignm("Alignment");
 
     aligner_view_ = new AssemblyObjectAlignerView(assembly_tab);
-    assembly_tab->addTab(aligner_view_, tabname_Alignm);
+    idx_alignment_tab = assembly_tab->addTab(aligner_view_, tabname_Alignm);
 
     // aligner
     aligner_ = new AssemblyObjectAligner(motion_manager_);
@@ -250,6 +250,9 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
     connect(aligner_view_->button_alignerEmergencyStop(), SIGNAL(clicked()), motion_manager_, SLOT(emergency_stop()));
     connect(aligner_view_->button_alignerEmergencyStop(), SIGNAL(clicked()), zfocus_finder_ , SLOT(emergencyStop()));
 
+    connect(this, SIGNAL(set_alignmentMode_PSP_request()), aligner_view_, SLOT(set_alignmentMode_PSP()));
+    connect(this, SIGNAL(set_alignmentMode_PSS_request()), aligner_view_, SLOT(set_alignmentMode_PSS()));
+
     NQLog("AssemblyMainWindow", NQLog::Message) << "added view " << tabname_Alignm;
     // ---------------------------------------------------------
 
@@ -259,8 +262,7 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
     smart_motion_ = new AssemblySmartMotionManager(motion_manager_);
 
-
-    const int assembly_sequence(config->getValue<int>("assembly_sequence", 1));
+    const int assembly_sequence(config->getDefaultValue<int>("main", "assembly_sequence", 1));
 
     if(assembly_sequence == 1)
     {
@@ -273,8 +275,6 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
       NQLog("AssemblyMainWindow", NQLog::Message) << "added view " << tabname_Assembly
          << " (assembly_sequence = " << assembly_sequence << ")";
-
-      emit DBLogMessage("== Using default assembly sequence == (MaPSA glued to baseplate last)");
     }
     else if(assembly_sequence == 2)
     {
@@ -285,14 +285,11 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
       assemblyV2_view_ = new AssemblyAssemblyV2View(assemblyV2_, assembly_tab);
       assembly_tab->addTab(assemblyV2_view_, tabname_Assembly);
 
-    // assembly_ = new AssemblyAssembly(motion_manager_, conradManager_, smart_motion_); // CONRAD
-    //assembly_ = new AssemblyAssembly(motion_manager_, vellemanManager_, smart_motion_);  // VELLEMAN 
-
+      connect(assemblyV2_, SIGNAL(switchToAlignmentTab_PSP_request()), this, SLOT(update_alignment_tab_psp()));
+      connect(assemblyV2_, SIGNAL(switchToAlignmentTab_PSS_request()), this, SLOT(update_alignment_tab_pss()));
 
       NQLog("AssemblyMainWindow", NQLog::Message) << "added view " << tabname_Assembly
          << " (assembly_sequence = " << assembly_sequence << ")";
-
-      emit DBLogMessage("== Using modified assembly sequence == (MaPSA glued to baseplate first)");
     }
     else
     {
@@ -375,7 +372,7 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
     hwctr_view_->Vacuum_Widget()->updateVacuumChannelsStatus();
 
     // enable motion stage controllers at startup
-    const bool startup_motion_stage = config->getValue<bool>("startup_motion_stage", false);
+    const bool startup_motion_stage = config->getDefaultValue<bool>("main", "startup_motion_stage", false);
 
     if(startup_motion_stage)
     {
@@ -387,6 +384,9 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
       NQLog("AssemblyMainWindow", NQLog::Message) << "added view " << tabname_HWCtrl;
     }
+
+    //-- Automatically restart the Motion Stage when the 'positions vector has invalid size' error appears
+    connect(motion_manager_, SIGNAL(restartMotionStage_request()), hwctr_view_->LStepExpress_Widget(), SLOT(restart()));
     // ---------------------------------------------------------
 
     // PARAMETERS VIEW -----------------------------------------
@@ -394,10 +394,6 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
     params_view_ = new AssemblyParametersView(controls_tab);
     controls_tab->addTab(params_view_, tabname_Parameters);
-
-    params_->set_view(params_view_);
-
-    params_view_->copy_values(params_->map_double());
 
     NQLog("AssemblyMainWindow", NQLog::Message) << "added view " << tabname_Parameters;
 
@@ -464,8 +460,13 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
 
     //connect_DBLogger();
 
-    //if(assembly_sequence == 1) {emit DBLogMessage("== Using default assembly sequence == (MaPSA glued to baseplate last)");}
-    //else if(assembly_sequence == 2) {emit DBLogMessage("== Using modified assembly sequence == (MaPSA glued to baseplate first)");}
+    //Dump all assembly parameter values to DBlogfile (components thicknesses, predefined movements, etc.) to DBLog file, for archiving
+    emit DBLogMessage("== ASSEMBLY PARAMETER VALUES...\n-------------------------");
+    params_view_->Dump_UserValues_toDBlogfile(DBlogfile_path);
+    emit DBLogMessage("-------------------------\n\n\n");
+
+    if(assembly_sequence == 1) {emit DBLogMessage("== Using default assembly sequence == (MaPSA glued to baseplate last)");}
+    else if(assembly_sequence == 2) {emit DBLogMessage("== Using modified assembly sequence == (MaPSA glued to baseplate first)");}
 
     //controls_tab->addTab(DBLog_view_, tabname_DBLog);
     //NQLog("AssemblyMainWindow", NQLog::Message) << "added view " << tabname_DBLog;
@@ -536,7 +537,7 @@ AssemblyMainWindow::AssemblyMainWindow(const QString& outputdir_path, const QStr
     NQLog("AssemblyMainWindow", NQLog::Message) << "application initialized successfully";
 
     // enable camera at startup
-    const bool startup_camera = config->getValue<bool>("startup_camera", false);
+    const bool startup_camera = config->getDefaultValue<bool>("main", "startup_camera", false);
 
     if(startup_camera)
     {
@@ -550,6 +551,20 @@ void AssemblyMainWindow::liveUpdate()
     NQLog("AssemblyMainWindow", NQLog::Debug) << "liveUpdate: emitting signal \"image_request\"";
 
     emit image_request();
+}
+
+//-- Slot function to display a GUI message whenever the Motion Stage gets automatically restarted
+void AssemblyMainWindow::messageBox_restartMotionStage()
+{
+    NQLog("AssemblyMainWindow", NQLog::Debug) << "messageBox_restartMotionStage: displaying pop-up message box";
+
+    //-- Display informative pop-up before restarting the MS
+    QMessageBox::information(this, tr("Motion Stage Error -- Restarting"),
+            tr("<p>The motion stage returned a position vector with invalid size, and will be automatically restarted."
+            "<p>If it still does not respond, you may try to restart it again by clicking 'Restart Motion Stage' in the tab 'HW Controllers'.</p>"
+        ));
+
+    return;
 }
 
 void AssemblyMainWindow::enable_images()
@@ -576,7 +591,7 @@ void AssemblyMainWindow::enable_images()
   connect(image_ctr_, SIGNAL(camera_disabled()), this      , SLOT(disconnect_images()));
 
   connect(this      , SIGNAL(image_request())  , image_ctr_, SLOT(acquire_image()));
-  connect(this      , SIGNAL(autofocus_ON ())  , image_ctr_, SLOT( enable_autofocus()));
+  connect(this      , SIGNAL(autofocus_ON ())  , image_ctr_, SLOT(enable_autofocus()));
   connect(this      , SIGNAL(autofocus_OFF())  , image_ctr_, SLOT(disable_autofocus()));
   connect(image_view_, SIGNAL(request_image()), image_ctr_, SLOT(acquire_image()));
 
@@ -702,6 +717,7 @@ void AssemblyMainWindow::connect_images()
 
   connect(image_view_->autofocus_emergencyStop_button(), SIGNAL(clicked()), zfocus_finder_, SLOT(emergencyStop()));
   connect(image_view_->autofocus_emergencyStop_button(), SIGNAL(clicked()), image_ctr_    , SLOT(restore_autofocus_settings()));
+  connect(image_view_->autofocus_emergencyStop_button(), SIGNAL(clicked()), image_ctr_    , SLOT(disable_autofocus())); //Added explicit call to disable_autofocus() when clicking 'Stop Auto-Focus' (to mitigate rare issues where the ZFocusFinder does not get disconnected, and gets triggered when clicking 'Snapshot') //NB: if needed, can also simply tick/untick the 'Auto-focusing' button to force-disable the autofocus module
 
   NQLog("AssemblyMainWindow", NQLog::Message) << "connect_images"
      << ": enabled images in application view(s)";
@@ -722,6 +738,10 @@ void AssemblyMainWindow::disconnect_images()
   disconnect(image_view_, SIGNAL(image_loaded(cv::Mat)), image_ctr_, SLOT(retrieve_image(cv::Mat)));
 
   disconnect(image_view_->autofocus_button(), SIGNAL(clicked()), image_ctr_, SLOT(acquire_autofocused_image()));
+
+  disconnect(image_view_->autofocus_emergencyStop_button(), SIGNAL(clicked()), zfocus_finder_, SLOT(emergencyStop()));
+  disconnect(image_view_->autofocus_emergencyStop_button(), SIGNAL(clicked()), image_ctr_    , SLOT(restore_autofocus_settings()));
+  disconnect(image_view_->autofocus_emergencyStop_button(), SIGNAL(clicked()), image_ctr_    , SLOT(disable_autofocus()));
 
   NQLog("AssemblyMainWindow", NQLog::Message) << "disconnect_images"
      << ": disabled images in application view(s)";
@@ -745,19 +765,6 @@ void AssemblyMainWindow::start_objectAligner(const AssemblyObjectAligner::Config
        << ": AssemblyObjectAligner already connected, no action taken";
 
     return;
-  }
-
-  if(params_ != nullptr)
-  {
-    const bool valid_params = params_->update();
-
-    if(valid_params == false)
-    {
-      NQLog("AssemblyMainWindow", NQLog::Warning) << "start_objectAligner"
-         << ": failed to update AssemblyParameters, no action taken";
-
-      return;
-    }
   }
 
   // acquire image
@@ -1090,19 +1097,6 @@ void AssemblyMainWindow::start_multiPickupTest(const AssemblyMultiPickupTester::
     return;
   }
 
-  if(params_ != nullptr)
-  {
-    const bool valid_params = params_->update();
-
-    if(valid_params == false)
-    {
-      NQLog("AssemblyMainWindow", NQLog::Warning) << "start_multiPickupTest"
-         << ": failed to update AssemblyParameters, no action taken";
-
-      return;
-    }
-  }
-
   toolbox_view_->MultiPickupTester_Widget()->enable(false);
 
   connect(multipickup_tester_, SIGNAL(measurement_finished()), multipickup_tester_, SLOT(start_pickup()));
@@ -1165,12 +1159,18 @@ void AssemblyMainWindow::disconnect_multiPickupTest()
      << ": multi-pickup test completed";
 }
 
-//Disconnect remaining signal/slots, which did not get disconnected via specific functions
+//Disconnect remaining signal/slots, which did not get disconnected via specific functions //Actually miss several, not needed ?
 void AssemblyMainWindow::disconnect_otherSlots()
 {
-    disconnect(params_view_, SIGNAL(request_movetoabsrefposition(double,double,double,double)), motion_manager_, SLOT(moveAbsolute(double,double,double,double)));
+    disconnect(params_view_, SIGNAL(request_moveToAbsRefPosition(double,double,double,double)), motion_manager_, SLOT(moveAbsolute(double,double,double,double)));
     disconnect(params_view_, SIGNAL(request_moveByRelRefDistance(double,double,double,double)), motion_manager_, SLOT(moveRelative(double,double,double,double)));
     disconnect(image_view_, SIGNAL(sigRequestMoveRelative(double,double,double,double)), motion_manager_, SLOT(moveRelative(double,double,double,double)));
+    disconnect(motion_manager_, SIGNAL(restartMotionStage_request()), hwctr_view_->LStepExpress_Widget(), SLOT(restart()));
+    disconnect(motion_manager_, SIGNAL(restartMotionStage_request()), this, SLOT(messageBox_restartMotionStage()));
+    disconnect(assemblyV2_, SIGNAL(switchToAlignmentTab_PSP_request()), this, SLOT(update_alignment_tab_psp()));
+    disconnect(assemblyV2_, SIGNAL(switchToAlignmentTab_PSS_request()), this, SLOT(update_alignment_tab_pss()));
+    disconnect(this, SIGNAL(set_alignmentMode_PSP_request()), aligner_view_, SLOT(set_alignmentMode_PSP()));
+    disconnect(this, SIGNAL(set_alignmentMode_PSS_request()), aligner_view_, SLOT(set_alignmentMode_PSS()));
 
     return;
 }
@@ -1262,6 +1262,28 @@ void AssemblyMainWindow::quit()
     return;
 }
 
+//-- Automatically switch to 'Alignment' sub-tab and emit signal relevant for PSS/PSP
+void AssemblyMainWindow::update_alignment_tab_psp()
+{
+    this->switchAndUpdate_alignment_tab(true);
+}
+void AssemblyMainWindow::update_alignment_tab_pss()
+{
+    this->switchAndUpdate_alignment_tab(false);
+}
+void AssemblyMainWindow::switchAndUpdate_alignment_tab(bool psp_mode)
+{
+    // std::cout<<"There are "<<main_tab->count()<<" main tabs"<<std::endl; //Count main tabs
+    // QTabWidget* assemblyTab = main_tab->findChild<QTabWidget*>("Module Assembly");
+    QList<QTabWidget*> widgets = main_tab->findChildren<QTabWidget*>(); //Get main tabs
+    QTabWidget* assemblyTab = widgets[1]; //Get 'Module Assembly' main tab
+    // std::cout<<"There are "<<assemblyTab->count()<<" sub-tabs"<<std::endl; //Count sub-tabs
 
+    assemblyTab->setCurrentIndex(idx_alignment_tab); //Switch to 'Alignment' sub-tab
 
+    //Emit signal to set either PSP or PSS alignment mode
+    if(psp_mode) {emit set_alignmentMode_PSP_request();}
+    else {emit set_alignmentMode_PSS_request();}
 
+    return;
+}

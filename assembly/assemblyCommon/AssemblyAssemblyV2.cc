@@ -846,8 +846,11 @@ void AssemblyAssemblyV2::GoToXYAPositionToGlueMaPSAToBaseplate_start()
 
   const double dz0 = 0.0;
 
+//const double uglySolution = 1.8;
+
   const double da0 =
      config_->getValue<double>("parameters", "RefPointPlatform_A")
+     //config_->getValue<double>("parameters", "FromRefPointPlatformtoPSPEdge_dA")
    - motion_->get_position_A();
 
   connect(this, SIGNAL(move_relative_request(double, double, double, double)), motion_, SLOT(moveRelative(double, double, double, double)));
@@ -1006,6 +1009,7 @@ void AssemblyAssemblyV2::GoToXYAPositionToGluePSSToSpacers_start()
 
   const double da0 =
      config_->getValue<double>("parameters", "RefPointPlatform_A")
+   //+ config_->getValue<double>("parameters", "Thickness_SpacerClamp")
    - motion_->get_position_A();
 
   connect(this, SIGNAL(move_relative_request(double, double, double, double)), motion_, SLOT(moveRelative(double, double, double, double)));
@@ -1082,6 +1086,7 @@ void AssemblyAssemblyV2::LowerPSSOntoSpacers_start()
       + config_->getValue<double>("parameters", "FromCameraBestFocusToPickupHeight_dZ")
       + config_->getValue<double>("parameters", "Thickness_PSS")
       + config_->getValue<double>("parameters", "Thickness_GlueLayer")
+      + config_->getValue<double>("parameters", "Thickness_SpacerClamp")
       - motion_->get_position_Z();
 
     const double da0 = 0.0;

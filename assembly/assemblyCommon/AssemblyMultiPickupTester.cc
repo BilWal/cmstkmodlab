@@ -13,7 +13,7 @@
 #include <nqlogger.h>
 #include <ApplicationConfig.h>
 
-#include <AssemblyMultiPickupTester.h>
+#include <AssemblyMultiPickupTester.h>  
 
 AssemblyMultiPickupTester::AssemblyMultiPickupTester(const LStepExpressMotionManager* motion_manager, QObject* parent)
  : QObject(parent)
@@ -353,7 +353,7 @@ void AssemblyMultiPickupTester::setup_next_step()
         {
           picked_up_ = true;
 
-          const double dz = +1.0 * pickup_deltaZ_;
+          const double dz = +1.0 * pickup_deltaZ_; 
 
           NQLog("AssemblyMultiPickupTester", NQLog::Spam) << "setup_next_step"
              << ": emitting signal \"move_relative(0, 0, " << dz << ", 0)\"";

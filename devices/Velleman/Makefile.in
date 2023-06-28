@@ -23,6 +23,7 @@ EXISTDEPEND   = $(shell find . -name \*.d -type f -print)
 
 all: depend lib vellemanTest
 
+
 depend: $(ALLDEPEND)
 
 lib: $(LIBDIR)/lib$(LIB).so

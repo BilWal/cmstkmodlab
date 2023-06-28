@@ -124,6 +124,7 @@ int main(int argc, char** argv)
 
     AssemblyMainWindow mainWindow(outputdir_path, logfile_path, DBlogfile_path);
 
+
     mainWindow.setWindowTitle("Automated Pixel-Strip Module Assembly ["+QString(APPLICATIONVERSIONSTR)+"]");
     mainWindow.setWindowState(Qt::WindowMaximized);
 
